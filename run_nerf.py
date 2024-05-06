@@ -835,7 +835,8 @@ def train():
             save_tensor_to_npz(batch_rays,f'{basedir}/{expname}/{i}_batch_rays')
             save_tensor_to_npz(coords,f'{basedir}/{expname}/{i}_coords')
             save_tensor_to_npz(target_s,f'{basedir}/{expname}/{i}_target_s')
-            save_tensor_to_npz(extras,f'{basedir}/{expname}/{i}_extras')
+            print(f"extras:{extras}")
+            # save_tensor_to_npz(extras,f'{basedir}/{expname}/{i}_extras')
             save_tensor_to_npz(rgb,f'{basedir}/{expname}/{i}_rgb')
             if args.use_viewdirs:
                 render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
