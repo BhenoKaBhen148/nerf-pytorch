@@ -90,6 +90,9 @@ class NeRF(nn.Module):
             self.feature_linear = nn.Linear(W, W)
             self.alpha_linear = nn.Linear(W, 1)
             self.rgb_linear = nn.Linear(W//2, 3)
+            # self.r_linear = nn.Linear(W//2, 1)
+            # self.g_linear = nn.Linear(W//2, 1)
+            # self.b_linear = nn.Linear(W//2, 1)
         else:
             self.output_linear = nn.Linear(W, output_ch)
 
@@ -110,8 +113,12 @@ class NeRF(nn.Module):
             for i, l in enumerate(self.views_linears):
                 h = self.views_linears[i](h)
                 h = F.relu(h)
-
             rgb = self.rgb_linear(h)
+            # Split_RGB
+            # r = self.r_linear(h)
+            # g = self.g_linear(h)
+            # b = self.b_linear(h)
+            # rgb = torch.cat([r,g,b],-1)
             outputs = torch.cat([rgb, alpha], -1)
         else:
             outputs = self.output_linear(h)
@@ -151,6 +158,10 @@ class NeRF(nn.Module):
 
 # Ray helpers
 def get_rays(H, W, K, c2w):
+    # Rays_Dは光線のθφω(向き情報)，これはあくまでワールド座標系
+    # Rays_Oは光線のxzy位置，これもワールド座標系
+    # Dirs:W,Hの要素を取り出して，各配列に入れて，レンズの歪みを加算したもの
+    # 光線の一つなので，θにはWの焦点距離の影響，φにはHの焦点距離の影響，ωは1が移入される．
     i, j = torch.meshgrid(torch.linspace(0, W-1, W), torch.linspace(0, H-1, H))  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()

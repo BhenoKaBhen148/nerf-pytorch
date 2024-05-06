@@ -18,7 +18,7 @@ from load_deepvoxels import load_dv_data
 from load_blender import load_blender_data
 from load_LINEMOD import load_LINEMOD_data
 
-
+import json
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
@@ -119,6 +119,7 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
 
     near, far = near * torch.ones_like(rays_d[...,:1]), far * torch.ones_like(rays_d[...,:1])
     rays = torch.cat([rays_o, rays_d, near, far], -1)
+    save_tensor_to_npz(rays,"rays_all_info")
     if use_viewdirs:
         rays = torch.cat([rays, viewdirs], -1)
 
@@ -292,6 +293,7 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
 
     alpha = raw2alpha(raw[...,3] + noise, dists)  # [N_rays, N_samples]
     # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
+    # torch.cumprod：要素をその一個前の値と掛け合わせる．
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1.-alpha + 1e-10], -1), -1)[:, :-1]
     rgb_map = torch.sum(weights[...,None] * rgb, -2)  # [N_rays, 3]
 
@@ -530,6 +532,16 @@ def config_parser():
 
     return parser
 
+def save_tensor_to_npz(tensor, file_path):
+    """
+    テンソルをNPZファイルに書き出す
+    
+    Args:
+        tensor (numpy.ndarray): 書き出すテンソル
+        file_path (str): 出力ファイルのパス
+    """
+    tensor_data = tensor.tolist()
+    np.savez(file_path,tensor_data)
 
 def train():
 
@@ -637,7 +649,7 @@ def train():
             file.write(open(args.config, 'r').read())
 
     # Create nerf model
-    render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_nerf(args)
+        render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_nerf(args)
     global_step = start
 
     bds_dict = {
@@ -673,7 +685,8 @@ def train():
 
     # Prepare raybatch tensor if batching random rays
     N_rand = args.N_rand
-    use_batching = not args.no_batching
+    use_batching = not args.no_batching # defaults is no_batching=True(use_batching=False)
+    # non Default process
     if use_batching:
         # For random ray batching
         print('get rays')
@@ -746,21 +759,31 @@ def train():
                     if i == start:
                         print(f"[Config] Center cropping of size {2*dH} x {2*dW} is enabled until iter {args.precrop_iters}")                
                 else:
+                    # この状態だとまだ箱を作るだけ．
                     coords = torch.stack(torch.meshgrid(torch.linspace(0, H-1, H), torch.linspace(0, W-1, W)), -1)  # (H, W, 2)
 
                 coords = torch.reshape(coords, [-1,2])  # (H * W, 2)
+                #　箱の中からランダムな光線を選択 
                 select_inds = np.random.choice(coords.shape[0], size=[N_rand], replace=False)  # (N_rand,)
+                # long()はInt64に変換
                 select_coords = coords[select_inds].long()  # (N_rand, 2)
                 rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
                 rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-                batch_rays = torch.stack([rays_o, rays_d], 0)
+                
+                batch_rays = torch.stack([rays_o, rays_d], 0)## RAYのInfo()
                 target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+
 
         #####  Core optimization loop  #####
         rgb, disp, acc, extras = render(H, W, K, chunk=args.chunk, rays=batch_rays,
                                                 verbose=i < 10, retraw=True,
                                                 **render_kwargs_train)
+        
 
+        
+        # print("ray_o",rays_o)
+        # print("rey_d",rays_d)
+        # 
         optimizer.zero_grad()
         img_loss = img2mse(rgb, target_s)
         trans = extras['raw'][...,-1]
@@ -807,13 +830,20 @@ def train():
             moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
             imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
             imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
-
-            # if args.use_viewdirs:
-            #     render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
-            #     with torch.no_grad():
-            #         rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
-            #     render_kwargs_test['c2w_staticcam'] = None
-            #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
+            save_tensor_to_npz(rays_o,f'{basedir}/{expname}/{i}_ray_o')
+            save_tensor_to_npz(rays_d,f'{basedir}/{expname}/{i}_ray_d')
+            save_tensor_to_npz(batch_rays,f'{basedir}/{expname}/{i}_batch_rays')
+            save_tensor_to_npz(coords,f'{basedir}/{expname}/{i}_coords')
+            save_tensor_to_npz(target_s,f'{basedir}/{expname}/{i}_target_s')
+            save_tensor_to_npz(extras,f'{basedir}/{expname}/{i}_extras')
+            save_tensor_to_npz(rgb,f'{basedir}/{expname}/{i}_rgb')
+            if args.use_viewdirs:
+                render_kwargs_test['c2w_staticcam'] = render_poses[0][:3,:4]
+                with torch.no_grad():
+                    # rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
+                    rgbs_still, _ = render_path(render_poses, hwf, K,args.chunk, render_kwargs_test)
+                render_kwargs_test['c2w_staticcam'] = None
+                imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
         if i%args.i_testset==0 and i > 0:
             testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
@@ -827,8 +857,8 @@ def train():
     
         if i%args.i_print==0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
-        """
-            print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
+            """
+            # print(expname, i, psnr.detach(), loss.detach(), global_step.cpu().detach().numpy())
             print('iter time {:.05f}'.format(dt))
 
             with tf.contrib.summary.record_summaries_every_n_global_steps(args.i_print):
@@ -867,7 +897,7 @@ def train():
                         tf.contrib.summary.image('rgb0', to8b(extras['rgb0'])[tf.newaxis])
                         tf.contrib.summary.image('disp0', extras['disp0'][tf.newaxis,...,tf.newaxis])
                         tf.contrib.summary.image('z_std', extras['z_std'][tf.newaxis,...,tf.newaxis])
-        """
+            """
 
         global_step += 1
 
