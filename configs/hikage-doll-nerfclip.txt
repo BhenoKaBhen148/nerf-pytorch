@@ -1,7 +1,7 @@
-expname = room_test
+expname = TUT-hikage-doll-NeRFClip
 basedir = ./logs
-datadir = ./data/nerf_llff_data/room
-dataset_type = llff
+datadir = ./data/360-nerf_FOR_DIFF/doll-hikage_x5
+dataset_type = blender
 
 factor = 8
 llffhold = 8
@@ -13,3 +13,4 @@ N_importance = 64
 use_viewdirs = True
 raw_noise_std = 1e0
 
+no_batching = True
