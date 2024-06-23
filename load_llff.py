@@ -60,8 +60,9 @@ def _minify(basedir, factors=[], resolutions=[]):
         
         
 def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
-    
+    #  width=None, height=None, load_imgs=True)＝Option
     poses_arr = np.load(os.path.join(basedir, 'poses_bounds.npy'))
+    # POSE:NP配列から2このデータを後ろ3つを削除→1次元掘り下げて、3列、5行の配列にReshappe→1,2,0の順番に転置（次元をくっつけて削減）
     poses = poses_arr[:, :-2].reshape([-1, 3, 5]).transpose([1,2,0])
     bds = poses_arr[:, -2:].transpose([1,0])
     
@@ -70,7 +71,7 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
     sh = imageio.imread(img0).shape
     
     sfx = ''
-    
+    # downsampling Sorce Images
     if factor is not None:
         sfx = '_{}'.format(factor)
         _minify(basedir, factors=[factor])
@@ -106,10 +107,11 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         return poses, bds
     
     def imread(f):
-        if f.endswith('png'):
-            return imageio.imread(f, ignoregamma=True)
-        else:
-            return imageio.imread(f)
+        # if f.endswith('png'):
+            # return imageio.imread(f, ignoregamma=True)
+        # else:
+            #  return imageio.imread(f)
+        return imageio.imread(f)
         
     imgs = imgs = [imread(f)[...,:3]/255. for f in imgfiles]
     imgs = np.stack(imgs, -1)  

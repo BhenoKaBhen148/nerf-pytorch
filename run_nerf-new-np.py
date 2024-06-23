@@ -12,7 +12,7 @@ from tqdm import tqdm, trange
 
 import matplotlib.pyplot as plt
 
-from run_nerf_helpers import *
+from run_nerf_helpers_new_np import *
 
 from load_llff import load_llff_data
 from load_deepvoxels import load_dv_data
@@ -120,7 +120,7 @@ def render(H, W, K, chunk=1024*32, rays=None, c2w=None, ndc=True,
 
     near, far = near * torch.ones_like(rays_d[...,:1]), far * torch.ones_like(rays_d[...,:1])
     rays = torch.cat([rays_o, rays_d, near, far], -1)
-    save_tensor_to_npz(rays,"rays_all_info")
+    # save_tensor_to_npz(rays,"rays_all_info")
     if use_viewdirs:
         rays = torch.cat([rays, viewdirs], -1)
 

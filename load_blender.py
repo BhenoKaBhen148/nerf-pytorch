@@ -54,7 +54,9 @@ def load_blender_data(basedir, half_res=False, testskip=1):
             skip = testskip
             
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(basedir, frame['file_path'] + '.png')
+            
+            # fname = os.path.join(basedir, frame['file_path'] + '.png')
+            fname = os.path.join(basedir, frame['file_path'] )
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame['transform_matrix']))
         imgs = (np.array(imgs) / 255.).astype(np.float32) # keep all 4 channels (RGBA)
@@ -81,7 +83,10 @@ def load_blender_data(basedir, half_res=False, testskip=1):
 
         imgs_half_res = np.zeros((imgs.shape[0], H, W, 4))
         for i, img in enumerate(imgs):
-            imgs_half_res[i] = cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
+            img_half_res = cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA)
+            img_half_res_RGBA =  cv2.cvtColor(img_half_res,cv2.COLOR_BGR2RGBA)
+            img_half_res_BGRA = img_half_res_RGBA[:,:,[2,1,0,3]]
+            imgs_half_res[i] = img_half_res_BGRA
         imgs = imgs_half_res
         # imgs = tf.image.resize_area(imgs, [400, 400]).numpy()
 
