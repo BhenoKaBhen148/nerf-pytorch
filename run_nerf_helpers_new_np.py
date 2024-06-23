@@ -166,13 +166,14 @@ def get_rays(H, W, K, c2w):
     i = i.t()
     j = j.t()
     dirs = torch.stack([(i/W-1/2)*360, -(j/H-1/2)*360, -torch.ones_like(i)], -1)
+    print(dirs[])
     # i, j = torch.meshgrid(torch.linspace(0, THETA-1, THETA), torch.linspace(0, PHI-1, PHI))  # pytorch's meshgrid has indexing='ij'
     # i = i.t()
     # j = j.t()
     # dirs = torch.stack([(i-K[0][2])/K[0][0], -(j-K[1][2])/K[1][1], -torch.ones_like(i)], -1)
 
     # Rotate ray directions from camera frame to the world frame
-    rays_d = torch.sum(c2w[:3,:3]* dirs[..., np.newaxis, :] * torch.inverse(c2w[:3,:3]), -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
+    rays_d = torch.sum(c2w[:3,:3]* dirs[..., np.newaxis, :] * torch.(c2w[:3,:3]), -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
     rays_o = c2w[:3,-1].expand(rays_d.shape)
     return rays_o, rays_d
